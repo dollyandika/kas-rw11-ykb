@@ -315,36 +315,105 @@
       XLSX.writeFile(workbook, fileName);
     }
 
-    // --- FUNGSI DOWNLOAD PDF ---
-    function downloadPDF() {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-      const selectedBulan = document.getElementById("filterBulan").value;
+    // --- FUNGSI DOWNLOAD PDF DENGAN KOLOM TANDA TANGAN PERANGKAT RW ---
+// Silakan sesuaikan nama-nama berikut sesuai perangkat RW 11 YKB yang menjabat:
+const NAMA_KETUA_RW   = "Nama Ketua RW";
+const NAMA_SEKRETARIS = "Nama Sekretaris";
+const NAMA_BENDAHARA  = "Nama Bendahara";
 
-      doc.setFontSize(14);
-      doc.text("Laporan KAS RW 11 YKB", 14, 15);
-      doc.setFontSize(10);
-      doc.text(`Periode: ${selectedBulan === "semua" ? "Semua Bulan" : selectedBulan}`, 14, 22);
+function downloadPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const selectedBulan = document.getElementById("filterBulan").value;
 
-      const tableRows = currentFilteredData.map(item => [
-        formatTanggal(item.tanggal),
-        item.keterangan,
-        item.pemasukan ? 'Rp ' + item.pemasukan.toLocaleString('id-ID') : '-',
-        item.pengeluaran ? 'Rp ' + item.pengeluaran.toLocaleString('id-ID') : '-',
-        'Rp ' + (item.currentSaldo || 0).toLocaleString('id-ID')
-      ]);
+  // 1. Fungsi Otomatis Hitung Tanggal Akhir Bulan (Format: Batam, DD MMMM YYYY)
+  function getTglAkhirBulanFormatted(selectedBulan) {
+    const namaBulanIndo = [
+      "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+      "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+    ];
 
-      doc.autoTable({
-        startY: 28,
-        head: [['Tanggal', 'Keterangan', 'Pemasukan', 'Pengeluaran', 'Saldo']],
-        body: tableRows,
-        theme: 'grid',
-        headStyles: { fillColor: [0, 92, 83] },
-        styles: { fontSize: 8 }
-      });
+    let tglObj;
+    if (selectedBulan && selectedBulan !== "semua") {
+      const parts = selectedBulan.split("-");
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10);
+      // Tanggal 0 dari bulan berikutnya memunculkan hari/tanggal terakhir bulan terpilih
+      tglObj = new Date(year, month, 0); 
+    } else {
+      // Jika filter "semua bulan", gunakan tanggal hari ini
+      tglObj = new Date();
+    }
 
-      const fileName = `Laporan_Kas_RW11_YKB_${selectedBulan}.pdf`;
-      doc.save(fileName);
+    const tgl = tglObj.getDate();
+    const bln = namaBulanIndo[tglObj.getMonth()];
+    const thn = tglObj.getFullYear();
+
+    return `Batam, ${tgl} ${bln} ${thn}`;
+  }
+
+  // 2. Judul & Periode Laporan
+  doc.setFontSize(14);
+  doc.setFont("helvetica", "bold");
+  doc.text("LAPORAN KAS RW 11 YKB", 14, 15);
+
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Periode: ${selectedBulan === "semua" ? "Semua Bulan" : selectedBulan}`, 14, 22);
+
+  // 3. Penyusunan Isi Tabel
+  const tableRows = currentFilteredData.map(item => [
+    formatTanggal(item.tanggal),
+    item.keterangan,
+    item.pemasukan ? 'Rp ' + item.pemasukan.toLocaleString('id-ID') : '-',
+    item.pengeluaran ? 'Rp ' + item.pengeluaran.toLocaleString('id-ID') : '-',
+    'Rp ' + (item.currentSaldo || 0).toLocaleString('id-ID')
+  ]);
+
+  doc.autoTable({
+    startY: 26,
+    head: [['Tanggal', 'Keterangan', 'Pemasukan', 'Pengeluaran', 'Saldo']],
+    body: tableRows,
+    theme: 'grid',
+    headStyles: { fillColor: [0, 92, 83] },
+    styles: { fontSize: 8 }
+  });
+
+  // 4. Perhitungan Posisi Kolom Tanda Tangan
+  let finalY = doc.lastAutoTable.finalY + 12;
+
+  // Jika tabel terlalu panjang mendekati batas bawah kertas, buat halaman baru untuk TDT
+  if (finalY + 45 > doc.internal.pageSize.getHeight()) {
+    doc.addPage();
+    finalY = 20;
+  }
+
+  const teksTanggal = getTglAkhirBulanFormatted(selectedBulan);
+
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+
+  // Cetak Lokasi & Tanggal Akhir Bulan (Di Atas Kolom Bendahara)
+  doc.text(teksTanggal, 145, finalY);
+
+  // Cetak Jabatan Sisi Kiri & Kanan
+  doc.text("Sekretaris RW 11", 20, finalY + 6);
+  doc.text("Bendahara RW 11", 145, finalY + 6);
+
+  // Cetak Jabatan Ketua (Bagian Tengah)
+  doc.text("Mengetahui,", 85, finalY + 12);
+  doc.text("Ketua RW 11 YKB", 82, finalY + 18);
+
+  // Cetak Nama Terang Perangkat RW (Bagian Bawah Tanda Tangan)
+  doc.setFont("helvetica", "bold");
+  doc.text(`( ${NAMA_SEKRETARIS} )`, 15, finalY + 38);
+  doc.text(`( ${NAMA_BENDAHARA} )`, 140, finalY + 38);
+  doc.text(`( ${NAMA_KETUA_RW} )`, 78, finalY + 42);
+
+  // 5. Unduh / Simpan File PDF
+  const fileName = `Laporan_Kas_RW11_YKB_${selectedBulan}.pdf`;
+  doc.save(fileName);
+}
     }
 
     // Jalankan pertama kali
