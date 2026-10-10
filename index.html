@@ -219,37 +219,81 @@
 
     function render() {
       const selectedBulan = document.getElementById("filterBulan").value;
-      currentFilteredData = rawData.filter(d => {
+      
+      // Filter data sesuai bulan yang dipilih
+      let filtered = rawData.filter(d => {
         if (selectedBulan === "semua") return true;
         return d.tanggal && d.tanggal.startsWith(selectedBulan);
       });
 
-      let totalIn = 0, totalOut = 0, displaySaldo = 0;
+      // --- LOGIKA OTOMATIS: TAMBAHKAN SISA SALDO BULAN LALU JIKA FILTER PER BULAN ---
+      currentFilteredData = [];
+      let saldoAwalBulan = 0;
+
+      if (selectedBulan !== "semua") {
+        // Cari semua data SEBELUM bulan yang dipilih untuk menghitung saldo sisa
+        const dataSebelumnya = rawData.filter(d => d.tanggal && d.tanggal.substring(0, 7) < selectedBulan);
+        if (dataSebelumnya.length > 0) {
+          saldoAwalBulan = dataSebelumnya[dataSebelumnya.length - 1].currentSaldo;
+        }
+
+        // Jika ada sisa saldo dari bulan lalu, buat baris tiruan (virtual row) di awal tabel
+        if (saldoAwalBulan !== 0 || dataSebelumnya.length > 0) {
+          // Format nama bulan sebelumnya (misal: "2026-09" -> "September 2026")
+          const [thn, bln] = selectedBulan.split('-');
+          const dTemp = new Date(thn, bln - 2, 1); // Bulan sebelumnya
+          const namaBulanLalu = dTemp.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+
+          currentFilteredData.push({
+            tanggal: `${thn}-${bln}-01`,
+            keterangan: `Sisa saldo bulan ${namaBulanLalu}`,
+            pemasukan: saldoAwalBulan,
+            pengeluaran: 0,
+            isSaldoAwal: true, // Penanda bahwa ini baris otomatis
+            currentSaldo: saldoAwalBulan
+          });
+        }
+      }
+
+      // Masukkan data transaksi asli pada bulan tersebut
+      let runningSaldo = saldoAwalBulan;
+      filtered.forEach(item => {
+        // Jika baris bukan saldo awal buatan, hitung saldo berjalannya
+        runningSaldo += (Number(item.pemasukan) || 0) - (Number(item.pengeluaran) || 0);
+        item.currentSaldo = runningSaldo;
+        currentFilteredData.push(item);
+      });
+      // --------------------------------------------------------------------------
+
+      let totalIn = 0, totalOut = 0;
       const tbody = document.getElementById("tabelBody");
       tbody.innerHTML = "";
 
       currentFilteredData.forEach(item => {
-        totalIn += item.pemasukan;
-        totalOut += item.pengeluaran;
-        displaySaldo = item.currentSaldo;
+        // Jika bukan baris saldo awal tiruan, hitung total pemasukan/pengeluaran bulan ini saja
+        if (!item.isSaldoAwal) {
+          totalIn += Number(item.pemasukan) || 0;
+          totalOut += Number(item.pengeluaran) || 0;
+        }
 
         const tr = document.createElement("tr");
-        tr.className = "hover:bg-gray-50";
+        tr.className = item.isSaldoAwal ? "bg-gray-50 italic text-gray-500 font-medium" : "hover:bg-gray-50";
+        
         tr.innerHTML = `
           <td class="p-3 text-xs text-gray-600">${formatTanggal(item.tanggal)}</td>
           <td class="p-3 font-medium">${item.keterangan}</td>
           <td class="p-3 text-right text-emerald-600 font-semibold">${item.pemasukan ? 'Rp ' + item.pemasukan.toLocaleString('id-ID') : ''}</td>
           <td class="p-3 text-right text-red-600 font-semibold">${item.pengeluaran ? 'Rp ' + item.pengeluaran.toLocaleString('id-ID') : ''}</td>
           <td class="p-3 text-right font-bold text-gray-700">Rp ${item.currentSaldo.toLocaleString('id-ID')}</td>
-          ${isAdmin ? `<td class="p-3 text-center flex justify-center gap-2">
+          ${isAdmin && !item.isSaldoAwal ? `<td class="p-3 text-center flex justify-center gap-2">
             <button onclick="mulaiEdit(${item.id})" class="text-blue-600 hover:text-blue-800 text-xs font-bold">Edit</button>
             <button onclick="hapusData(${item.id})" class="text-red-500 hover:text-red-700 text-xs font-bold">Hapus</button>
-          </td>` : ''}
+          </td>` : `<td class="p-3 text-center"></td>`}
         `;
         tbody.appendChild(tr);
       });
 
-      // Jika difilter per bulan, ambil saldo terakhir pada filter tersebut
+      // Tampilkan ringkasan kartu di atas
       let finalSaldo = currentFilteredData.length > 0 ? currentFilteredData[currentFilteredData.length - 1].currentSaldo : 0;
 
       document.getElementById("totalPemasukan").innerText = "Rp " + totalIn.toLocaleString('id-ID');
