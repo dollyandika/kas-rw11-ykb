@@ -7,15 +7,18 @@
   <link rel="manifest" href="manifest.json">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Pustaka Ekspor Excel & PDF -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body class="bg-gray-100 font-sans text-gray-800 pb-12">
 
+  <!-- Header Utama -->
   <header class="bg-[#005c53] text-white p-4 shadow-md">
     <div class="max-w-4xl mx-auto flex items-center justify-between">
       <div class="flex items-center gap-3">
+        <!-- Logo Komplek YKB -->
         <div class="w-12 h-12 rounded-full overflow-hidden border-2 border-white bg-white flex-shrink-0">
           <img src="logo.png" class="w-full h-full object-cover">
         </div>
@@ -29,6 +32,7 @@
 
   <div class="max-w-4xl mx-auto px-4 mt-6">
 
+    <!-- Filter & Tombol Aksi -->
     <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
       <div>
         <label class="block text-xs font-semibold text-gray-600 mb-1">Periode</label>
@@ -49,6 +53,7 @@
       </div>
     </div>
 
+    <!-- Ringkasan Saldo -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
       <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
         <p class="text-xs font-semibold text-gray-500">Pemasukan</p>
@@ -64,19 +69,23 @@
       </div>
     </div>
 
+    <!-- Form Input / Edit Admin -->
     <div id="formAdmin" class="hidden bg-amber-50 p-4 rounded-xl shadow-sm border border-amber-200 mb-6">
-      <h3 class="font-bold text-amber-900 mb-3 text-sm">➕ Tambah Transaksi Baru (Khusus Admin)</h3>
+      <h3 id="formTitle" class="font-bold text-amber-900 mb-3 text-sm">➕ Tambah Transaksi Baru (Khusus Admin)</h3>
+      <input type="hidden" id="editId" value="">
       <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-        <input type="date" id="inputTanggal" class="p-2 text-sm border rounded">
-        <input type="text" id="inputKeterangan" placeholder="Keterangan" class="p-2 text-sm border rounded">
-        <input type="number" id="inputPemasukan" placeholder="Pemasukan (Rp)" class="p-2 text-sm border rounded">
-        <input type="number" id="inputPengeluaran" placeholder="Pengeluaran (Rp)" class="p-2 text-sm border rounded">
+        <input type="date" id="inputTanggal" class="p-2 text-sm border rounded bg-white">
+        <input type="text" id="inputKeterangan" placeholder="Keterangan" class="p-2 text-sm border rounded bg-white">
+        <input type="number" id="inputPemasukan" placeholder="Pemasukan (Rp)" class="p-2 text-sm border rounded bg-white">
+        <input type="number" id="inputPengeluaran" placeholder="Pengeluaran (Rp)" class="p-2 text-sm border rounded bg-white">
       </div>
       <div class="mt-3 flex justify-end gap-2">
+        <button id="btnBatalEdit" onclick="resetForm()" class="hidden bg-gray-500 text-white px-3 py-2 text-sm rounded font-semibold hover:bg-gray-600">Batal</button>
         <button onclick="simpanData()" class="bg-teal-700 text-white px-4 py-2 text-sm rounded font-semibold hover:bg-teal-800">Simpan ke Google Sheet</button>
       </div>
     </div>
 
+    <!-- Tabel Data -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto mb-6">
       <table id="tabelLaporan" class="w-full text-sm text-left">
         <thead class="bg-gray-50 text-gray-600 border-b">
@@ -95,6 +104,7 @@
       </table>
     </div>
 
+    <!-- Grafik Per Bulan -->
     <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
       <h3 class="font-bold text-gray-700 mb-4 text-sm">Grafik per bulan</h3>
       <div class="h-64">
@@ -106,6 +116,7 @@
 
   </div>
 
+  <!-- Tombol Melayang Otomatis untuk Instal PWA -->
   <button id="btnInstallApp" onclick="installPWA()" class="hidden fixed bottom-5 right-5 bg-teal-700 text-white font-bold text-xs px-4 py-3 rounded-full shadow-lg border-2 border-white hover:bg-teal-800 z-50 flex items-center gap-2">
     📱 Instal Aplikasi Kas
   </button>
@@ -119,6 +130,18 @@
     let isAdmin = false;
     let adminPin = "";
     let myChart = null;
+
+    // Skrip Auto-Update Cache / Versi Aplikasi
+    const APP_VERSION = 'v2.3'; // Naikkan versi ini jika ada update berikutnya di masa depan
+    if (localStorage.getItem('app_version') !== APP_VERSION) {
+      if ('caches' in window) {
+        caches.keys().then((names) => {
+          names.forEach((name) => caches.delete(name));
+        });
+      }
+      localStorage.setItem('app_version', APP_VERSION);
+      window.location.reload(true);
+    }
 
     // Variabel & Listener PWA Install Prompt
     let deferredPrompt;
@@ -134,9 +157,6 @@
       if (deferredPrompt) {
         deferredPrompt.prompt();
         deferredPrompt.userChoice.then((choiceResult) => {
-          if (choiceResult.outcome === 'accepted') {
-            console.log('Pengguna menerima instalasi aplikasi');
-          }
           deferredPrompt = null;
           if (btnInstall) btnInstall.classList.add('hidden');
         });
@@ -156,6 +176,17 @@
       try {
         const res = await fetch(`${API_URL}?action=getData`);
         rawData = await res.json();
+        
+        // 1. Urutkan data otomatis berdasarkan tanggal secara kronologis (Terlama ke Terbaru)
+        rawData.sort((a, b) => new Date(a.tanggal) - new Date(b.tanggal));
+
+        // 2. Hitung saldo berjalan (running saldo) dengan akurat
+        let runningSaldo = 0;
+        rawData.forEach(item => {
+          runningSaldo += (Number(item.pemasukan) || 0) - (Number(item.pengeluaran) || 0);
+          item.currentSaldo = runningSaldo;
+        });
+
         setupFilterOptions();
         render();
       } catch (e) {
@@ -171,7 +202,7 @@
       const bulanSet = new Set();
       rawData.forEach(item => {
         if (item.tanggal) {
-          const m = item.tanggal.substring(0, 7); // YYYY-MM
+          const m = item.tanggal.substring(0, 7);
           bulanSet.add(m);
         }
       });
@@ -193,15 +224,14 @@
         return d.tanggal && d.tanggal.startsWith(selectedBulan);
       });
 
-      let totalIn = 0, totalOut = 0, runningSaldo = 0;
+      let totalIn = 0, totalOut = 0, displaySaldo = 0;
       const tbody = document.getElementById("tabelBody");
       tbody.innerHTML = "";
 
       currentFilteredData.forEach(item => {
         totalIn += item.pemasukan;
         totalOut += item.pengeluaran;
-        runningSaldo += (item.pemasukan - item.pengeluaran);
-        item.currentSaldo = runningSaldo;
+        displaySaldo = item.currentSaldo;
 
         const tr = document.createElement("tr");
         tr.className = "hover:bg-gray-50";
@@ -210,15 +240,21 @@
           <td class="p-3 font-medium">${item.keterangan}</td>
           <td class="p-3 text-right text-emerald-600 font-semibold">${item.pemasukan ? 'Rp ' + item.pemasukan.toLocaleString('id-ID') : ''}</td>
           <td class="p-3 text-right text-red-600 font-semibold">${item.pengeluaran ? 'Rp ' + item.pengeluaran.toLocaleString('id-ID') : ''}</td>
-          <td class="p-3 text-right font-bold text-gray-700">Rp ${runningSaldo.toLocaleString('id-ID')}</td>
-          ${isAdmin ? `<td class="p-3 text-center"><button onclick="hapusData(${item.id})" class="text-red-500 hover:text-red-700 text-xs font-bold">Hapus</button></td>` : ''}
+          <td class="p-3 text-right font-bold text-gray-700">Rp ${item.currentSaldo.toLocaleString('id-ID')}</td>
+          ${isAdmin ? `<td class="p-3 text-center flex justify-center gap-2">
+            <button onclick="mulaiEdit(${item.id})" class="text-blue-600 hover:text-blue-800 text-xs font-bold">Edit</button>
+            <button onclick="hapusData(${item.id})" class="text-red-500 hover:text-red-700 text-xs font-bold">Hapus</button>
+          </td>` : ''}
         `;
         tbody.appendChild(tr);
       });
 
+      // Jika difilter per bulan, ambil saldo terakhir pada filter tersebut
+      let finalSaldo = currentFilteredData.length > 0 ? currentFilteredData[currentFilteredData.length - 1].currentSaldo : 0;
+
       document.getElementById("totalPemasukan").innerText = "Rp " + totalIn.toLocaleString('id-ID');
       document.getElementById("totalPengeluaran").innerText = "Rp " + totalOut.toLocaleString('id-ID');
-      document.getElementById("saldoKas").innerText = "Rp " + runningSaldo.toLocaleString('id-ID');
+      document.getElementById("saldoKas").innerText = "Rp " + finalSaldo.toLocaleString('id-ID');
 
       renderChart();
     }
@@ -243,6 +279,7 @@
       } else {
         isAdmin = false;
         adminPin = "";
+        resetForm();
         document.getElementById("formAdmin").classList.add("hidden");
         document.getElementById("thAksi").classList.add("hidden");
         document.getElementById("btnAdmin").innerText = "🔒 Mode Admin";
@@ -250,7 +287,37 @@
       }
     }
 
+    // --- FUNGSI PILIH DATA UNTUK DIEDIT ---
+    function mulaiEdit(id) {
+      const item = rawData.find(d => d.id == id);
+      if (!item) return;
+
+      document.getElementById("editId").value = item.id;
+      document.getElementById("inputTanggal").value = item.tanggal;
+      document.getElementById("inputKeterangan").value = item.keterangan;
+      document.getElementById("inputPemasukan").value = item.pemasukan || "";
+      document.getElementById("inputPengeluaran").value = item.pengeluaran || "";
+
+      document.getElementById("formTitle").innerText = "✏️ Edit Transaksi (ID: " + item.id + ")";
+      document.getElementById("btnBatalEdit").classList.remove("hidden");
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function resetForm() {
+      document.getElementById("editId").value = "";
+      document.getElementById("inputTanggal").value = "";
+      document.getElementById("inputKeterangan").value = "";
+      document.getElementById("inputPemasukan").value = "";
+      document.getElementById("inputPengeluaran").value = "";
+
+      document.getElementById("formTitle").innerText = "➕ Tambah Transaksi Baru (Khusus Admin)";
+      document.getElementById("btnBatalEdit").classList.add("hidden");
+    }
+
+    // --- FUNGSI SIMPAN ATAU UPDATE DATA ---
     async function simpanData() {
+      const editId = document.getElementById("editId").value;
       const tanggal = document.getElementById("inputTanggal").value;
       const keterangan = document.getElementById("inputKeterangan").value;
       const pemasukan = Number(document.getElementById("inputPemasukan").value) || 0;
@@ -261,19 +328,22 @@
         return;
       }
 
-      const payload = { action: "add", pin: adminPin, tanggal, keterangan, pemasukan, pengeluaran };
+      const actionType = editId ? "edit" : "add";
+      const payload = { action: actionType, pin: adminPin, id: editId, tanggal, keterangan, pemasukan, pengeluaran };
       
-      const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) });
-      const result = await res.json();
-      
-      if (result.status === "success") {
-        alert("Data berhasil disimpan!");
-        document.getElementById("inputKeterangan").value = "";
-        document.getElementById("inputPemasukan").value = "";
-        document.getElementById("inputPengeluaran").value = "";
-        loadData();
-      } else {
-        alert(result.message);
+      try {
+        const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) });
+        const result = await res.json();
+        
+        if (result.status === "success") {
+          alert(result.message);
+          resetForm();
+          loadData();
+        } else {
+          alert(result.message);
+        }
+      } catch (err) {
+        alert("Terjadi kesalahan koneksi.");
       }
     }
 
@@ -346,9 +416,9 @@
     // --- NAMA PERANGKAT RW ---
     const NAMA_KETUA_RW   = "Haryanto, S.Pd., M.H.";
     const NAMA_SEKRETARIS = "Suyitno, S.Pd";
-    const NAMA_BENDAHARA  = "Agus supriyanto";
+    const NAMA_BENDAHARA  = "Agus Supriyanto";
 
-    // --- FUNGSI DOWNLOAD PDF DENGAN TANDA TANGAN & TANGGAL AKHIR BULAN ---
+    // --- FUNGSI DOWNLOAD PDF ---
     function downloadPDF() {
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
@@ -427,27 +497,7 @@
       doc.save(fileName);
     }
 
-    // Jalankan pertama kali saat halaman dimuat
     loadData();
   </script>
-  <script>
-  // Cek versi aplikasi saat halaman dimuat
-  const APP_VERSION = 'v2.1'; // Ubah versi ini setiap kali Anda melakukan update besar berikutnya (misal: v2.2, v2.3, dst)
-  
-  if (localStorage.getItem('app_version') !== APP_VERSION) {
-    // Jika versi di HP warga berbeda dengan versi terbaru di server, bersihkan cache dan muat ulang
-    if ('caches' in window) {
-      caches.keys().then((names) => {
-        names.forEach((name) => {
-          caches.delete(name);
-        });
-      });
-    }
-    // Simpan versi terbaru ke memori HP warga
-    localStorage.setItem('app_version', APP_VERSION);
-    // Muat ulang halaman secara otomatis untuk mengambil file terbaru dari GitHub
-    window.location.reload(true);
-  }
-</script>
 </body>
 </html>
