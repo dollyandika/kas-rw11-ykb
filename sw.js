@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kas-rw11-v4';
+const CACHE_NAME = 'kas-rw11-v5';
 const urlsToCache = [
   './',
   './index.html',
