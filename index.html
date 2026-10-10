@@ -430,5 +430,24 @@
     // Jalankan pertama kali saat halaman dimuat
     loadData();
   </script>
+  <script>
+  // Cek versi aplikasi saat halaman dimuat
+  const APP_VERSION = 'v2.1'; // Ubah versi ini setiap kali Anda melakukan update besar berikutnya (misal: v2.2, v2.3, dst)
+  
+  if (localStorage.getItem('app_version') !== APP_VERSION) {
+    // Jika versi di HP warga berbeda dengan versi terbaru di server, bersihkan cache dan muat ulang
+    if ('caches' in window) {
+      caches.keys().then((names) => {
+        names.forEach((name) => {
+          caches.delete(name);
+        });
+      });
+    }
+    // Simpan versi terbaru ke memori HP warga
+    localStorage.setItem('app_version', APP_VERSION);
+    // Muat ulang halaman secara otomatis untuk mengambil file terbaru dari GitHub
+    window.location.reload(true);
+  }
+</script>
 </body>
 </html>
