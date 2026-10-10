@@ -20,7 +20,7 @@
       <div class="flex items-center gap-3">
         <!-- Logo Komplek YKB -->
         <div class="w-12 h-12 rounded-full overflow-hidden border-2 border-white bg-white flex-shrink-0">
-          <img src="logo.png" class="w-full h-full object-cover">
+          <img id="logoImg" src="logo.png" class="w-full h-full object-cover">
         </div>
         <div>
           <h1 class="text-xl font-bold leading-tight">Laporan KAS RW 11 YKB</h1>
@@ -132,7 +132,7 @@
     let myChart = null;
 
     // Skrip Auto-Update Cache / Versi Aplikasi
-    const APP_VERSION = 'v2.4'; // Naikkan versi ini jika ada update berikutnya di masa depan
+    const APP_VERSION = 'v2.5'; // Naikkan versi ini agar cache di HP warga langsung ter-update
     if (localStorage.getItem('app_version') !== APP_VERSION) {
       if ('caches' in window) {
         caches.keys().then((names) => {
@@ -220,28 +220,23 @@
     function render() {
       const selectedBulan = document.getElementById("filterBulan").value;
       
-      // Filter data sesuai bulan yang dipilih
       let filtered = rawData.filter(d => {
         if (selectedBulan === "semua") return true;
         return d.tanggal && d.tanggal.startsWith(selectedBulan);
       });
 
-      // --- LOGIKA OTOMATIS: TAMBAHKAN SISA SALDO BULAN LALU JIKA FILTER PER BULAN ---
       currentFilteredData = [];
       let saldoAwalBulan = 0;
 
       if (selectedBulan !== "semua") {
-        // Cari semua data SEBELUM bulan yang dipilih untuk menghitung saldo sisa
         const dataSebelumnya = rawData.filter(d => d.tanggal && d.tanggal.substring(0, 7) < selectedBulan);
         if (dataSebelumnya.length > 0) {
           saldoAwalBulan = dataSebelumnya[dataSebelumnya.length - 1].currentSaldo;
         }
 
-        // Jika ada sisa saldo dari bulan lalu, buat baris tiruan (virtual row) di awal tabel
         if (saldoAwalBulan !== 0 || dataSebelumnya.length > 0) {
-          // Format nama bulan sebelumnya (misal: "2026-09" -> "September 2026")
           const [thn, bln] = selectedBulan.split('-');
-          const dTemp = new Date(thn, bln - 2, 1); // Bulan sebelumnya
+          const dTemp = new Date(thn, bln - 2, 1);
           const namaBulanLalu = dTemp.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
 
           currentFilteredData.push({
@@ -249,28 +244,24 @@
             keterangan: `Sisa saldo bulan ${namaBulanLalu}`,
             pemasukan: saldoAwalBulan,
             pengeluaran: 0,
-            isSaldoAwal: true, // Penanda bahwa ini baris otomatis
+            isSaldoAwal: true,
             currentSaldo: saldoAwalBulan
           });
         }
       }
 
-      // Masukkan data transaksi asli pada bulan tersebut
       let runningSaldo = saldoAwalBulan;
       filtered.forEach(item => {
-        // Jika baris bukan saldo awal buatan, hitung saldo berjalannya
         runningSaldo += (Number(item.pemasukan) || 0) - (Number(item.pengeluaran) || 0);
         item.currentSaldo = runningSaldo;
         currentFilteredData.push(item);
       });
-      // --------------------------------------------------------------------------
 
       let totalIn = 0, totalOut = 0;
       const tbody = document.getElementById("tabelBody");
       tbody.innerHTML = "";
 
       currentFilteredData.forEach(item => {
-        // Jika bukan baris saldo awal tiruan, hitung total pemasukan/pengeluaran bulan ini saja
         if (!item.isSaldoAwal) {
           totalIn += Number(item.pemasukan) || 0;
           totalOut += Number(item.pengeluaran) || 0;
@@ -293,7 +284,6 @@
         tbody.appendChild(tr);
       });
 
-      // Tampilkan ringkasan kartu di atas
       let finalSaldo = currentFilteredData.length > 0 ? currentFilteredData[currentFilteredData.length - 1].currentSaldo : 0;
 
       document.getElementById("totalPemasukan").innerText = "Rp " + totalIn.toLocaleString('id-ID');
@@ -331,7 +321,6 @@
       }
     }
 
-    // --- FUNGSI PILIH DATA UNTUK DIEDIT ---
     function mulaiEdit(id) {
       const item = rawData.find(d => d.id == id);
       if (!item) return;
@@ -359,7 +348,6 @@
       document.getElementById("btnBatalEdit").classList.add("hidden");
     }
 
-    // --- FUNGSI SIMPAN ATAU UPDATE DATA ---
     async function simpanData() {
       const editId = document.getElementById("editId").value;
       const tanggal = document.getElementById("inputTanggal").value;
@@ -438,7 +426,6 @@
       });
     }
 
-    // --- FUNGSI DOWNLOAD EXCEL ---
     function downloadExcel() {
       const selectedBulan = document.getElementById("filterBulan").value;
       const exportData = currentFilteredData.map(item => ({
@@ -457,13 +444,31 @@
       XLSX.writeFile(workbook, fileName);
     }
 
-    // --- NAMA PERANGKAT RW ---
-    const NAMA_KETUA_RW   = "Haryanto, S.Pd., M.H.";
-    const NAMA_SEKRETARIS = "Suyitno, S.Pd";
-    const NAMA_BENDAHARA  = "Agus Supriyanto";
+    const NAMA_KETUA_RW   = "Meky Kurniawan, S.Pd.";
+    const NAMA_SEKRETARIS = "Bobby Ramadhana";
+    const NAMA_BENDAHARA  = "Dolly Andika";
 
-    // --- FUNGSI DOWNLOAD PDF ---
-    function downloadPDF() {
+    // Fungsi bantu ubah gambar logo ke Base64 untuk PDF
+    function getBase64ImageFromUrl(imageUrl) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'Anonymous';
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          const dataURL = canvas.toDataURL('image/png');
+          resolve(dataURL);
+        };
+        img.onerror = error => reject(error);
+        img.src = imageUrl;
+      });
+    }
+
+    // --- FUNGSI DOWNLOAD PDF DENGAN LOGO DI KIRI ATAS ---
+    async function downloadPDF() {
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
       const selectedBulan = document.getElementById("filterBulan").value;
@@ -491,12 +496,31 @@
         return `Batam, ${tgl} ${bln} ${thn}`;
       }
 
-      doc.setFontSize(14);
-      doc.setFont("helvetica", "bold");
-      doc.text("LAPORAN KAS RW 11 YKB", 14, 15);
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      doc.text(`Periode: ${selectedBulan === "semua" ? "Semua Bulan" : selectedBulan}`, 14, 22);
+      // Coba masukkan logo ke PDF
+      let startYTable = 26;
+      try {
+        const logoDataUrl = await getBase64ImageFromUrl('logo.png');
+        // doc.addImage(imageData, format, x, y, width, height)
+        doc.addImage(logoDataUrl, 'PNG', 14, 10, 14, 14);
+        
+        // Jika ada logo, geser teks judul ke kanan dikit agar sejajar rapi
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.text("LAPORAN KAS RW 11 YKB", 32, 15);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text(`Periode: ${selectedBulan === "semua" ? "Semua Bulan" : selectedBulan}`, 32, 21);
+        startYTable = 28;
+      } catch (e) {
+        // Fallback jika logo gagal dimuat
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.text("LAPORAN KAS RW 11 YKB", 14, 15);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text(`Periode: ${selectedBulan === "semua" ? "Semua Bulan" : selectedBulan}`, 14, 22);
+        startYTable = 26;
+      }
 
       const tableRows = currentFilteredData.map(item => [
         formatTanggal(item.tanggal),
@@ -507,7 +531,7 @@
       ]);
 
       doc.autoTable({
-        startY: 26,
+        startY: startYTable,
         head: [['Tanggal', 'Keterangan', 'Pemasukan', 'Pengeluaran', 'Saldo']],
         body: tableRows,
         theme: 'grid',
